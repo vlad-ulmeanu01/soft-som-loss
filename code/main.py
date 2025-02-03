@@ -1,5 +1,6 @@
 from sklearn.metrics import classification_report, accuracy_score, precision_recall_fscore_support, confusion_matrix, ConfusionMatrixDisplay
 import matplotlib.pyplot as plt
+import itertools
 import torch
 import time
 import json
@@ -12,11 +13,13 @@ import utils
 
 
 def run_net(net, soft_som_loss, criterion, optimizer, gens, metrics, dset_type: str) -> list: # intoarce [(yTruth, yPred)].
+    t_start = time.time()
+
     with torch.set_grad_enabled(dset_type == "train"), torch.autograd.set_detect_anomaly(True):
         metrics[dset_type]["loss"].append(0.0)
 
         pair_count, all_yTruth, all_yPred = 0, [], []
-        for x, yTruth_indexes in gens[dset_type]:
+        for loop_id, (x, yTruth_indexes) in zip(itertools.count(1), gens[dset_type]):
             x, yTruth_indexes = x.to(utils.DEVICE), yTruth_indexes.to(utils.DEVICE)
 
             yPred, yPred_sll, _ = net(x)
@@ -27,8 +30,6 @@ def run_net(net, soft_som_loss, criterion, optimizer, gens, metrics, dset_type: 
 
                 loss = criterion(yPred, yTruth) + soft_som_loss(yPred_sll, yTruth_indexes)
                 # loss = criterion(yPred, yTruth)
-                # loss.backward(retain_graph = True)
-                # loss = soft_som_loss(yPred_sll, yTruth_indexes)
                 loss.backward()
 
                 optimizer.step()
@@ -37,15 +38,17 @@ def run_net(net, soft_som_loss, criterion, optimizer, gens, metrics, dset_type: 
 
             metrics[dset_type]["loss"][-1] += loss.detach().item() * x.shape[0]
             pair_count += x.shape[0]
-            print(f"ok {pair_count = }.", flush = True)
+            print(f"{dset_type = }, {round(time.time() - t_start, 3)}s elapsed, processed {loop_id}/{len(gens[dset_type])}, running loss = {round(metrics[dset_type]['loss'][-1] / pair_count, 3)}.", flush = True)
+            print(f"(SOM debug) soft_som_loss.dbg_time_spent = {utils.debug_ht_float_content(soft_som_loss.dbg_time_spent)}", flush = True)
 
             yPred_indexes = yPred.argmax(dim = 1)
             all_yTruth.append(yTruth_indexes.to("cpu"))
             all_yPred.append(yPred_indexes.to("cpu"))
 
-        print(f"Ended generator for loop ({dset_type = }).", flush = True)
-
         metrics[dset_type]["loss"][-1] = metrics[dset_type]["loss"][-1] / pair_count if pair_count else metrics[dset_type]["loss"][-1]
+
+        print(f"{dset_type = }, {round(time.time() - t_start, 3)}s elapsed, epoch ended with loss = {round(metrics[dset_type]['loss'][-1], 3)}", flush = True)
+
         return torch.cat(all_yTruth), torch.cat(all_yPred)
 
 
@@ -54,10 +57,11 @@ def main():
     runid = str(int(t_start))
 
     net = design.HwNetworkGlobal(len_output = len(utils.HT_DIR_CLASS))
-    soft_som_loss = som_loss.SoftSomLoss2d(map_length = 20, vector_length = net.fc_last_layer.in_features, num_classes = len(utils.HT_DIR_CLASS), lr = 1e-3, smoothing_kernel_std = 1)
+    soft_som_loss = som_loss.SoftSomLoss2d(map_length = 50, vector_length = net.fc_last_layer.in_features, num_classes = len(utils.HT_DIR_CLASS), lr = 1e-3, smoothing_kernel_std = 1, p_bmu_thresh = 5e-3)
 
     criterion = torch.nn.CrossEntropyLoss()
-    optimizer = torch.optim.Adam(net.parameters()) # + [soft_som_loss.weights]
+    optimizer = torch.optim.Adam(list(net.parameters()) + [soft_som_loss.weights])
+    # optimizer = torch.optim.Adam(net.parameters())
 
     print(f"({runid = }, {net = }, {criterion = }, {optimizer.param_groups = }, working on device: {utils.DEVICE}.")
     sys.stdout.flush()

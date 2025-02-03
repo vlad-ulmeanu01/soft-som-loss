@@ -4,8 +4,8 @@ import torch
 # import PIL
 
 IM_LEN = 160
-EPOCH_CNT = 100
-DEBUG_SAVE_EVERY = 10
+EPOCH_CNT = 30
+DEBUG_SAVE_EVERY = 5
 
 HT_DIR_CLASS = {
     "n01440764": "fish",
@@ -44,3 +44,6 @@ def get_px(fpath: str):
         im = im.broadcast_to([3, *im.shape[1:]])
 
     return im
+
+def debug_ht_float_content(ht: dict):
+    return ", ".join([f"{key}: {round(value, 3)}" for key, value in ht.items()])

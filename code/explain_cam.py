@@ -38,7 +38,7 @@ def main():
     ]
 
     nets = []
-    for fpath in ["../net_saves/net_1731409474_100.pt", "../net_saves/net_1737482404_30.pt"]:
+    for fpath in ["../net_saves/net_1731409474_100.pt", "../net_saves/net_1738586107_40.pt"]:
         nets.append(design.HwNetworkGlobal(len_output = len(utils.HT_DIR_CLASS)))
         nets[-1].load_state_dict(torch.load(fpath, weights_only = True))
         nets[-1].eval()

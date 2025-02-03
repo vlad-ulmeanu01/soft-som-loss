@@ -11,7 +11,7 @@ import utils
 
 def dbg_main():
     net = design.HwNetworkGlobal(len_output = len(utils.HT_DIR_CLASS))
-    net.load_state_dict(torch.load("../net_saves/net_1737482404_30.pt", weights_only = True))
+    net.load_state_dict(torch.load("../net_saves/net_1738586107_40.pt", weights_only = True))
     net.eval()
 
     criterion = torch.nn.CrossEntropyLoss()
