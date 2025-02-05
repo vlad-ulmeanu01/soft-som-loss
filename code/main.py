@@ -28,8 +28,7 @@ def run_net(net, soft_som_loss, criterion, optimizer, gens, metrics, dset_type: 
             if dset_type == "train":
                 optimizer.zero_grad()
 
-                loss = criterion(yPred, yTruth) + soft_som_loss(yPred_sll, yTruth_indexes)
-                # loss = criterion(yPred, yTruth)
+                loss = criterion(yPred, yTruth) + soft_som_loss(yPred_sll, yTruth_indexes) if utils.RUN_TYPE == "som" else criterion(yPred, yTruth)
                 loss.backward()
 
                 optimizer.step()
@@ -57,11 +56,10 @@ def main():
     runid = str(int(t_start))
 
     net = design.HwNetworkGlobal(len_output = len(utils.HT_DIR_CLASS))
-    soft_som_loss = som_loss.SoftSomLoss2d(map_length = 50, vector_length = net.fc_last_layer.in_features, num_classes = len(utils.HT_DIR_CLASS), lr = 1e-3, smoothing_kernel_std = 1, p_bmu_thresh = 5e-3)
+    soft_som_loss = som_loss.SoftSomLoss2d(map_length = 50, vector_length = net.fc_last_layer.in_features, num_classes = len(utils.HT_DIR_CLASS), smoothing_kernel_std = 1)
 
     criterion = torch.nn.CrossEntropyLoss()
-    optimizer = torch.optim.Adam(list(net.parameters()) + [soft_som_loss.weights])
-    # optimizer = torch.optim.Adam(net.parameters())
+    optimizer = torch.optim.Adam(list(net.parameters()) + [soft_som_loss.weights]) if utils.RUN_TYPE == "som" else torch.optim.Adam(net.parameters())
 
     print(f"({runid = }, {net = }, {criterion = }, {optimizer.param_groups = }, working on device: {utils.DEVICE}.")
     sys.stdout.flush()

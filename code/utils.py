@@ -4,8 +4,9 @@ import torch
 # import PIL
 
 IM_LEN = 160
-EPOCH_CNT = 30
-DEBUG_SAVE_EVERY = 5
+EPOCH_CNT = 50
+DEBUG_SAVE_EVERY = 50
+RUN_TYPE = "som" # "normal"
 
 HT_DIR_CLASS = {
     "n01440764": "fish",
@@ -19,6 +20,9 @@ HT_DIR_CLASS = {
     "n03445777": "golf_ball",
     "n03888257": "parachute"
 }
+
+# the class names, in the order they are read by the loader.
+LOADED_CLASS_NAMES = ["dog", "golf_ball", "french_horn", "gas_pump", "chain_saw", "fish", "parachute", "garbage_truck", "casette_player", "church"]
 
 DEVICE = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
 

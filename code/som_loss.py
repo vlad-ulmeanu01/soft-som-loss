@@ -10,16 +10,12 @@ class SoftSomLoss2d:
         map_length: int,
         vector_length: int,
         num_classes: int,
-        lr: float,
         smoothing_kernel_std: float,
-        p_bmu_thresh: float
     ):
         self.map_length = map_length
         self.vector_length = vector_length
         self.num_classes = num_classes
-        self.lr = lr
         self.smoothing_kernel_std = int(smoothing_kernel_std)
-        self.p_bmu_thresh = p_bmu_thresh
 
         # TODO: metode de initializare pentru self.weights? torch.nn.Parameter()?
         self.weights = torch.randn((self.map_length ** 2, self.vector_length + self.num_classes), requires_grad = True, device = utils.DEVICE)
@@ -60,6 +56,7 @@ class SoftSomLoss2d:
         dbg_time = time.time()
 
         # p_bmu_presm[i, j] = probability that the i-th vector from y_sll chooses the j-th SOM unit as its BMU (pre-smoothing)
+        # TODO: altceva decat softmin?
         p_bmu_presm = F.softmin(l2_dists, dim = 1)
 
         self.dbg_time_spent["p_bmu_presm"] += time.time() - dbg_time
@@ -81,18 +78,12 @@ class SoftSomLoss2d:
         dbg_time = time.time()
 
         loss = 0.0
-        # for i in range(y_sll.shape[0]):
-        #     for j in range(self.map_length ** 2):
-        #         if p_bmu[i, j] > self.p_bmu_thresh:
-        #             loss += p_bmu[i, j] * F.binary_cross_entropy(
-        #                 F.softmax(self.weights[j, self.vector_length:], dim = 0),
-        #                 onehot_mat[i]
-        #             )
 
+        sm_mat = F.softmax(self.weights[:, self.vector_length:], dim = 1)
         for i in range(y_sll.shape[0]):
             loss += (
                 p_bmu[i] * F.binary_cross_entropy(
-                    F.softmax(self.weights[:, self.vector_length:], dim = 1), # TODO softmax-ul asta e constant. pot sa-l calculez inainte si sa-l refolosesc aici?
+                    sm_mat,
                     onehot_mat[i].unsqueeze(dim = 0).broadcast_to(self.map_length ** 2, self.num_classes),
                     reduction = "none"
                 ).mean(dim = 1)
