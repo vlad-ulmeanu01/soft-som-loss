@@ -4,9 +4,10 @@ import torch
 # import PIL
 
 IM_LEN = 160
-EPOCH_CNT = 50
-DEBUG_SAVE_EVERY = 50
+EPOCH_CNT = 40
+DEBUG_SAVE_EVERY = 10
 RUN_TYPE = "som" # "normal"
+DEFAULT_SEED = 3479
 
 HT_DIR_CLASS = {
     "n01440764": "fish",

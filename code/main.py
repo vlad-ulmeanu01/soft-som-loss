@@ -1,5 +1,6 @@
 from sklearn.metrics import classification_report, accuracy_score, precision_recall_fscore_support, confusion_matrix, ConfusionMatrixDisplay
 import matplotlib.pyplot as plt
+import torch.nn.functional as F
 import itertools
 import torch
 import time
@@ -10,6 +11,9 @@ import som_loss
 import design
 import loader
 import utils
+
+
+torch.manual_seed(utils.DEFAULT_SEED)
 
 
 def run_net(net, soft_som_loss, criterion, optimizer, gens, metrics, dset_type: str) -> list: # intoarce [(yTruth, yPred)].
@@ -23,7 +27,7 @@ def run_net(net, soft_som_loss, criterion, optimizer, gens, metrics, dset_type: 
             x, yTruth_indexes = x.to(utils.DEVICE), yTruth_indexes.to(utils.DEVICE)
 
             yPred, yPred_sll, _ = net(x)
-            yTruth = torch.nn.functional.one_hot(yTruth_indexes).float()
+            yTruth = F.one_hot(yTruth_indexes, num_classes = len(utils.HT_DIR_CLASS)).float()
 
             if dset_type == "train":
                 optimizer.zero_grad()
@@ -56,7 +60,7 @@ def main():
     runid = str(int(t_start))
 
     net = design.HwNetworkGlobal(len_output = len(utils.HT_DIR_CLASS))
-    soft_som_loss = som_loss.SoftSomLoss2d(map_length = 50, vector_length = net.fc_last_layer.in_features, num_classes = len(utils.HT_DIR_CLASS), smoothing_kernel_std = 1)
+    soft_som_loss = som_loss.SoftSomLoss2d(map_length = 200, vector_length = net.fc_last_layer.in_features, num_classes = len(utils.HT_DIR_CLASS), smoothing_kernel_std = 5)
 
     criterion = torch.nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(list(net.parameters()) + [soft_som_loss.weights]) if utils.RUN_TYPE == "som" else torch.optim.Adam(net.parameters())
@@ -92,6 +96,10 @@ def main():
             metrics[dset_type]["report"].append(classification_report(yt, yp, target_names = index_to_class, zero_division = 0.0))
 
         if epoch % utils.DEBUG_SAVE_EVERY == 0 or epoch == utils.EPOCH_CNT:
+            if utils.RUN_TYPE == "som": # scheduler.
+                soft_som_loss.smoothing_kernel_std -= 1
+                soft_som_loss.update_smoothing_kernel()
+
             torch.save(net.state_dict(), f"../net_saves/net_{runid}_{epoch}.pt")
             torch.save(soft_som_loss.weights, f"../net_saves/som_weights_{runid}_{epoch}.pt")
 
