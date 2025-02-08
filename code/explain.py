@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import torch.nn.functional as F
 import numpy as np
+import torchvision
 import itertools
 import torch
 import os
@@ -11,8 +12,8 @@ import loader
 import utils
 
 
-NORMAL_NET_ID = "1738760468"
-SOM_NET_ID = "1738840750"
+NORMAL_NET_ID = "1739021122" # hw: 1738760468, vgg: 1739021122
+SOM_NET_ID = "1739022359"
 SOM_MAP_LENGTH = 200
 
 
@@ -46,6 +47,65 @@ def explain_cam(ims_classes, nets):
             ax[j].set_axis_off()
 
         fig.savefig(f"../pics/cam_pic_{SOM_NET_ID}/cam_pic_{i}.png", bbox_inches = "tight")
+        plt.close(fig)
+
+
+def explain_gradcam(ims_classes, nets, som):
+    im_len = 160 if utils.MODEL_TYPE == "hw" else 240
+    resizer = torchvision.transforms.Resize((im_len, im_len), antialias = None)
+    gradients = None
+
+    def fwd_grad_hook(module, input, output):
+        def bkw_grad_hook(g):
+            nonlocal gradients
+            gradients = g.detach()
+        output.register_hook(bkw_grad_hook) # register_hook e hook apelat la backward. se aplica pe tensor!
+
+    for net in nets:
+        if utils.MODEL_TYPE == "hw":
+            net.conv_layers[-1].register_forward_hook(fwd_grad_hook)
+        else:
+            net.avgpool.register_forward_hook(fwd_grad_hook)
+
+    for i, (im, im_class) in zip(itertools.count(), ims_classes):
+        fig, ax = plt.subplots(1, 3, figsize = (15, 15))
+
+        wanted_class = utils.LOADED_CLASS_NAMES.index(im_class) # index of wanted class, here in [0, 9].
+
+        ax[0].imshow(torch.permute(im[0].cpu(), (1, 2, 0)).detach().numpy())
+        ax[0].set_title("Original image")
+
+        if utils.MODEL_TYPE == "vgg": # im.shape: [1, 3, 160, 160] (hw) or [1, 3, 240, 240] (vgg)
+            im = resizer(im)
+
+        for net, j, msg in zip(nets, range(1, 3), ["normal net", "net with SOM loss"]):
+            gradients = None
+            out, out_sll, out_conv = net(im)
+
+            sm = F.softmax(out.detach()[0], dim = 0)
+            pred_class = utils.LOADED_CLASS_NAMES[sm.argmax().item()]
+
+            yTruth_indexes = torch.tensor([wanted_class], device = utils.DEVICE)
+            yTruth = F.one_hot(yTruth_indexes, num_classes = len(utils.HT_DIR_CLASS)).float()
+
+            # loss = F.cross_entropy(out, yTruth) + som(out_sll, yTruth_indexes) if j == 2 else F.cross_entropy(out, yTruth)
+            # loss.backward()
+            out[0, wanted_class].backward()
+
+            # print(f"{j = }, {gradients.shape = }, {gradients.requires_grad = }") # expected: [1, 512, 7, 7].
+
+            weights = gradients.mean(dim = [-2, -1]) # weights.shape = [1, 512].
+            gradcam = F.relu((out_conv.detach() * weights.view(1, -1, 1, 1)).mean(dim = 1)) # gradcam.shape = [1, 7, 7].
+
+            max_gradcam_val = gradcam.max().item()
+            gradcam /= max_gradcam_val
+            gradcam = resizer(gradcam) # gradcam.shape = [1, im_len, im_len]
+
+            ax[j].imshow(torch.permute(im[0] * gradcam, (1, 2, 0)).cpu().numpy())
+            ax[j].set_title(f"({msg}, predicted {pred_class} with\nproba {round(sm.max().item(), 2)}), GradCAM for {im_class}\n(proba {round(sm[wanted_class].item(), 2)})\nmax gradcam value = {round(max_gradcam_val, 6)}")
+            ax[j].set_axis_off()
+            
+        fig.savefig(f"../pics/cam_pic_{SOM_NET_ID}/gradcam_pic_{i}.png", bbox_inches = "tight")
         plt.close(fig)
 
 
@@ -110,18 +170,28 @@ def main():
 
     nets = []
     for fpath in [f"../net_saves/net_{NORMAL_NET_ID}_40.pt", f"../net_saves/net_{SOM_NET_ID}_40.pt"]:
-        nets.append(design.HwNetworkGlobal(len_output = len(utils.HT_DIR_CLASS)))
+        if utils.MODEL_TYPE == "hw":
+            nets.append(design.HwNetworkGlobal(len_output = len(utils.HT_DIR_CLASS)))
+        else:
+            nets.append(design.VGGUntrained(len_output = len(utils.HT_DIR_CLASS)))
+
         nets[-1].load_state_dict(torch.load(fpath, weights_only = True, map_location = utils.DEVICE))
         nets[-1].eval()
 
-    som = som_loss.SoftSomLoss2d(map_length = SOM_MAP_LENGTH, vector_length = nets[0].fc_last_layer.in_features, num_classes = len(utils.HT_DIR_CLASS), smoothing_kernel_std = 2)
+    som = som_loss.SoftSomLoss2d(
+        map_length = SOM_MAP_LENGTH,
+        vector_length = nets[0].fc_last_layer.in_features if utils.MODEL_TYPE == "hw" else nets[0].classifier[-1].in_features,
+        num_classes = len(utils.HT_DIR_CLASS),
+        smoothing_kernel_std = 5
+    )
     som.weights = torch.load(f"../net_saves/som_weights_{SOM_NET_ID}_40.pt", weights_only = True, map_location = utils.DEVICE)
 
     print("Loaded nets, som weights.", flush = True)
 
-    os.mkdir(f"../pics/cam_pic_{SOM_NET_ID}/")
+    # os.mkdir(f"../pics/cam_pic_{SOM_NET_ID}/")
 
-    explain_cam(ims_classes, nets)
+    # explain_cam(ims_classes, nets)
+    # explain_gradcam(ims_classes, nets, som)
     explain_som_class_representation(som)
 
 

@@ -1,4 +1,5 @@
 import torch.utils.data
+import torchvision
 import random
 import torch
 import os
@@ -28,6 +29,8 @@ class Dataset(torch.utils.data.Dataset):
                         self.class_ht[class_str]
                     ))
 
+        self.vgg_resizer = torchvision.transforms.Resize((240, 240), antialias = None)
+
         # TODO vezi cum poti sa pui tot self.dset direct pe gpu.
         print(f"Finished loading Dataset ({dset_type = }).")
 
@@ -45,5 +48,8 @@ class Dataset(torch.utils.data.Dataset):
 
         if random.randint(0, 1): #augmentare prin flip pe verticala.
             im = im.flip(dims = [-1])
+
+        if utils.MODEL_TYPE == "vgg":
+            im = self.vgg_resizer(im)
 
         return im, self.dset[ind][1]

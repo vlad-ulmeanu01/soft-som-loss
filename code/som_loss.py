@@ -58,11 +58,15 @@ class SoftSomLoss2d:
         p_bmu_presm = F.softmin(l2_dists / l2_dists.sum(dim = 1).view(-1, 1), dim = 1) # old: F.softmin(l2_dists, dim = 1).
 
         # apply the smoothing kernel (cross-correlation with padding).
-        p_bmu = F.conv2d(
-            p_bmu_presm.view(-1, self.map_length, self.map_length).unsqueeze(dim = 1), # add a dimension for in_channels = 1. -1 <=> batch_size.
-            self.smoothing_kernel.unsqueeze(dim = 0).unsqueeze(dim = 0), # add two dimensions for out_channels = in_channels = 1.
-            padding = 3 * self.smoothing_kernel_std
-        ).view(-1, self.map_length ** 2)
+        # also apply softmax over each unit (i.e. one softmax per each unit's batch_size probabilities. we want to force units to pick favourites)
+        p_bmu = F.softmax(
+            F.conv2d(
+                p_bmu_presm.view(-1, self.map_length, self.map_length).unsqueeze(dim = 1), # add a dimension for in_channels = 1. -1 <=> batch_size.
+                self.smoothing_kernel.unsqueeze(dim = 0).unsqueeze(dim = 0), # add two dimensions for out_channels = in_channels = 1.
+                padding = 3 * self.smoothing_kernel_std
+            ).view(-1, self.map_length ** 2),
+            dim = 0
+        )
         
         self.dbg_time_spent["other"] += time.time() - dbg_time; dbg_time = time.time()
 

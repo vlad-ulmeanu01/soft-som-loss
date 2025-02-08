@@ -59,8 +59,20 @@ def main():
     t_start = time.time()
     runid = str(int(t_start))
 
-    net = design.HwNetworkGlobal(len_output = len(utils.HT_DIR_CLASS))
-    soft_som_loss = som_loss.SoftSomLoss2d(map_length = 200, vector_length = net.fc_last_layer.in_features, num_classes = len(utils.HT_DIR_CLASS), smoothing_kernel_std = 5)
+    if utils.MODEL_TYPE == "hw":
+        net = design.HwNetworkGlobal(len_output = len(utils.HT_DIR_CLASS))
+    elif utils.MODEL_TYPE == "vgg":
+        net = design.VGGUntrained(len_output = len(utils.HT_DIR_CLASS))
+    else:
+        print(f"Unknown model type.. {utils.MODEL_TYPE = }")
+        assert(False)
+
+    soft_som_loss = som_loss.SoftSomLoss2d(
+        map_length = 200,
+        vector_length = net.fc_last_layer.in_features if utils.MODEL_TYPE == "hw" else net.classifier[-1].in_features,
+        num_classes = len(utils.HT_DIR_CLASS),
+        smoothing_kernel_std = 5
+    )
 
     criterion = torch.nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(list(net.parameters()) + [soft_som_loss.weights]) if utils.RUN_TYPE == "som" else torch.optim.Adam(net.parameters())
@@ -74,7 +86,7 @@ def main():
 
     gens = {}
     gens["train"] = torch.utils.data.DataLoader(dsets["train"], batch_size = 128, shuffle = True)
-    gens["test"] = torch.utils.data.DataLoader(dsets["test"], batch_size = len(dsets["test"]))
+    gens["test"] = torch.utils.data.DataLoader(dsets["test"], batch_size = len(dsets["test"]) if utils.MODEL_TYPE == "hw" else len(dsets["test"]) // 16)
 
     ht_index_to_class = {dsets["train"].class_ht[dirname]: utils.HT_DIR_CLASS[dirname] for dirname in dsets["train"].class_ht}
     index_to_class = [x for _, x in sorted(ht_index_to_class.items())]

@@ -1,3 +1,4 @@
+import torchvision
 import torch
 
 import som_loss
@@ -42,5 +43,27 @@ class HwNetworkGlobal(torch.nn.Module):
         out_sll = torch.hstack([out_sll, out_conv.sum(dim = [-2, -1])])
         
         out = self.fc_last_layer(out_sll)
+
+        return out, out_sll, out_conv
+
+class VGGUntrained(torch.nn.Module):
+    def __init__(self, len_output: int):
+        super(VGGUntrained, self).__init__()
+        og_vgg = torchvision.models.vgg11_bn()
+
+        self.features = og_vgg.features.to(utils.DEVICE)
+        self.avgpool = og_vgg.avgpool.to(utils.DEVICE) # TODO: VGG doesn't have GAP.
+        self.classifier = og_vgg.classifier.to(utils.DEVICE)
+
+        self.classifier[0] = torch.nn.Linear(25088, 768, device = utils.DEVICE)
+        self.classifier[3] = torch.nn.Linear(768, 768, device = utils.DEVICE)
+        self.classifier[6] = torch.nn.Linear(768, len_output, device = utils.DEVICE)
+
+        del og_vgg
+
+    def forward(self, x):
+        out_conv = self.avgpool(self.features(x))
+        out_sll = self.classifier[:-3](out_conv.view(x.shape[0], -1))
+        out = self.classifier[-3:](out_sll) # the last three layers are ReLU, Dropout and FC.
 
         return out, out_sll, out_conv
