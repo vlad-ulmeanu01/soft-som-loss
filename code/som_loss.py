@@ -55,46 +55,35 @@ class SoftSomLoss2d:
         l2_dists = torch.vstack([torch.linalg.vector_norm(y_sll[i] - self.weights[:, :self.vector_length], dim = 1) for i in range(len(y_sll))])
 
         # p_bmu_presm[i, j] = probability that the i-th vector from y_sll chooses the j-th SOM unit as its BMU (pre-smoothing)
-        p_bmu_presm = F.softmin(l2_dists / l2_dists.sum(dim = 1).view(-1, 1), dim = 1) # old: F.softmin(l2_dists, dim = 1).
+        p_bmu_presm = F.softmin(l2_dists / l2_dists.sum(dim = 1).view(-1, 1), dim = 1)
 
         # apply the smoothing kernel (cross-correlation with padding).
         # also apply softmax over each unit (i.e. one softmax per each unit's batch_size probabilities. we want to force units to pick favourites)
-        p_bmu = F.softmax(
-            F.conv2d(
-                p_bmu_presm.view(-1, self.map_length, self.map_length).unsqueeze(dim = 1), # add a dimension for in_channels = 1. -1 <=> batch_size.
-                self.smoothing_kernel.unsqueeze(dim = 0).unsqueeze(dim = 0), # add two dimensions for out_channels = in_channels = 1.
-                padding = 3 * self.smoothing_kernel_std
-            ).view(-1, self.map_length ** 2),
-            dim = 0
-        )
+        p_bmu = F.conv2d(
+            p_bmu_presm.view(-1, self.map_length, self.map_length).unsqueeze(dim = 1), # add a dimension for in_channels = 1. -1 <=> batch_size.
+            self.smoothing_kernel.unsqueeze(dim = 0).unsqueeze(dim = 0), # add two dimensions for out_channels = in_channels = 1.
+            padding = 3 * self.smoothing_kernel_std
+        ).view(-1, self.map_length ** 2)
         
         self.dbg_time_spent["other"] += time.time() - dbg_time; dbg_time = time.time()
+       
+        # tensor of shape [self.map_length**2, self.num_classes]. represents the probability distribution that a unit picks some class.
+        class_proba_dist_per_unit = F.softmax(
+            torch.hstack([
+                p_bmu[classes == z].sum(dim = 0).view(-1, 1)
+                for z in range(self.num_classes)
+            ]),
+            dim = 1
+        )
 
-        # TODO daca nu merge asta, incearca sa dai plot la cum se modifica in timp proba max de la softmin.
-        sm_mat = F.softmax(self.weights[:, self.vector_length:], dim = 1)
-        sm_argmax_cols = torch.argmax(sm_mat, dim = 1)
-        sm_maxes = sm_mat[torch.arange(sm_mat.shape[0]), sm_argmax_cols]
+        sm_weights = F.softmax(self.weights[:, self.vector_length:], dim = 1)
+        log_sm_weights = torch.log(sm_weights + 1e-10)
 
-        oh_mat_maxes_kept = torch.zeros_like(sm_mat)
-        oh_mat_maxes_kept[torch.arange(oh_mat_maxes_kept.shape[0]), sm_argmax_cols] = sm_maxes
-
-        # p_bmu[.] is an array of length map_length**2. instead of iterating through each batch element, we should instead add up all per-class contributions,
-        # since the BCE is the same for two different batch samples from the same class.
-        p_bmu_sum_per_class = [torch.zeros_like(p_bmu[0]) for z in range(self.num_classes)]
-        for i in range(y_sll.shape[0]):
-            p_bmu_sum_per_class[classes[i]] += p_bmu[i]
-
-        loss = 0.0
-        for z in range(self.num_classes):
-            # instead of keeping the wanted distribution to 1 only on the classes[i] position, we instead keep the argmax position as well to its current value.
-            # this way, we allow a small form of classes coexisting in the same unit. this will hopefully lead to clusters actually forming.
-            oh_mat = oh_mat_maxes_kept.clone()
-            oh_mat[:, z] = 1.0
-
-            loss += (
-                p_bmu_sum_per_class[z] * F.binary_cross_entropy(sm_mat, oh_mat, reduction = "none").mean(dim = 1)
-            ).sum()
-        loss /= y_sll.shape[0]
+        # the loss is the divergence between two distributions: unit class statistics, and the batch class distribution for that unit.
+        # we also penalize if the the distributions unite by becoming uniform (mode collapse?).
+        loss = F.kl_div(log_sm_weights, class_proba_dist_per_unit, reduction = "batchmean") -\
+               (class_proba_dist_per_unit * torch.log(class_proba_dist_per_unit + 1e-10)).sum(dim = 1).mean() -\
+               (sm_weights * log_sm_weights).sum(dim = 1).mean()
 
         self.dbg_time_spent["loss_for"] += time.time() - dbg_time
 

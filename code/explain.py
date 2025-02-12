@@ -13,7 +13,7 @@ import utils
 
 
 NORMAL_NET_ID = "1739021122" # hw: 1738760468, vgg: 1739021122
-SOM_NET_ID = "1739022359"
+SOM_NET_ID = "1739379754"
 SOM_MAP_LENGTH = 200
 
 
@@ -160,7 +160,35 @@ def main():
         ("../imagenette2-160/val/n03417042/n03417042_3140.JPEG", "garbage_truck"), # garbage_truck
         ("../imagenette2-160/val/n03417042/n03417042_3140.JPEG", "parachute"),
         ("../imagenette2-160/val/n03888257/n03888257_482.JPEG", "parachute"), # parachute
-        ("../imagenette2-160/val/n03888257/n03888257_482.JPEG", "garbage_truck")
+        ("../imagenette2-160/val/n03888257/n03888257_482.JPEG", "garbage_truck"),
+
+        ("../imagenette2-160/val/n02102040/n02102040_6800.JPEG", "dog"), # dog
+        ("../imagenette2-160/val/n02102040/n02102040_6800.JPEG", "fish"),
+        ("../imagenette2-160/val/n02102040/n02102040_6892.JPEG", "dog"), # dog
+        ("../imagenette2-160/val/n02102040/n02102040_6892.JPEG", "fish"),
+        ("../imagenette2-160/val/n02102040/n02102040_6892.JPEG", "golf_ball"),
+        ("../imagenette2-160/val/n02102040/n02102040_1222.JPEG", "dog"), # dog
+        ("../imagenette2-160/val/n02102040/n02102040_1222.JPEG", "parachute"),
+        ("../imagenette2-160/val/n03445777/n03445777_15131.JPEG", "golf_ball"), # golf_ball
+        ("../imagenette2-160/val/n03445777/n03445777_15131.JPEG", "fish"),
+        ("../imagenette2-160/val/n03445777/n03445777_1482.JPEG", "golf_ball"), # golf_ball
+        ("../imagenette2-160/val/n03445777/n03445777_1482.JPEG", "chain_saw"),
+        ("../imagenette2-160/val/n03394916/n03394916_15691.JPEG", "french_horn"), # french_horn
+        ("../imagenette2-160/val/n03394916/n03394916_15691.JPEG", "fish"),
+        ("../imagenette2-160/val/n03028079/n03028079_50060.JPEG", "church"), # church
+        ("../imagenette2-160/val/n03028079/n03028079_50060.JPEG", "fish"),
+        ("../imagenette2-160/val/n03028079/n03028079_50060.JPEG", "golf_ball"),
+        ("../imagenette2-160/val/n01440764/n01440764_13770.JPEG", "fish"), # fish
+        ("../imagenette2-160/val/n01440764/n01440764_13770.JPEG", "garbage_truck"),
+        ("../imagenette2-160/val/n01440764/n01440764_13770.JPEG", "french_horn"),
+        ("../imagenette2-160/val/n01440764/n01440764_13770.JPEG", "chain_saw"),
+        ("../imagenette2-160/val/n01440764/n01440764_13770.JPEG", "golf_ball"),
+        ("../imagenette2-160/val/n02979186/n02979186_482.JPEG", "casette_player"), # casette_player
+        ("../imagenette2-160/val/n02979186/n02979186_482.JPEG", "golf_ball"),
+        ("../imagenette2-160/val/n02979186/n02979186_1961.JPEG", "casette_player"), # casette_player
+        ("../imagenette2-160/val/n02979186/n02979186_1961.JPEG", "fish"),
+        ("../imagenette2-160/val/n03425413/n03425413_16581.JPEG", "gas_pump"), # gas_pump
+        ("../imagenette2-160/val/n03425413/n03425413_16581.JPEG", "church")
     ]
 
     ims_classes = [
@@ -188,10 +216,10 @@ def main():
 
     print("Loaded nets, som weights.", flush = True)
 
-    # os.mkdir(f"../pics/cam_pic_{SOM_NET_ID}/")
+    os.mkdir(f"../pics/cam_pic_{SOM_NET_ID}/")
 
     # explain_cam(ims_classes, nets)
-    # explain_gradcam(ims_classes, nets, som)
+    explain_gradcam(ims_classes, nets, som)
     explain_som_class_representation(som)
 
 

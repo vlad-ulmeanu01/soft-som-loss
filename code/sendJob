@@ -1,6 +1,6 @@
 #!/bin/sh
 
-sbatch -p dgxa100 -t 12:00:00 --gres gpu:1 --mem-per-cpu 32G --output=output.log --wrap="python explain.py" &&
+sbatch -p dgxa100 -t 12:00:00 --gres gpu:1 --mem-per-cpu 32G --output=output.log --wrap="python main.py" &&
 watch -n 1 squeue -u vlad_adrian.ulmeanu
 
 # cat timp a luat rularea jobului:
