@@ -7,14 +7,12 @@ import utils
 class SoftSomLoss2d:
     # callable from outside to schedule.
     def update_smoothing_kernel(self):
-        # TODO: 2x kernele 1d in loc de unul 2d?
-        self.smoothing_kernel = torch.exp(torch.distributions.normal.Normal(0, self.smoothing_kernel_std).log_prob(
-            torch.tensor(
-                [[(i**2 + j**2) ** 0.5 for j in torch.arange(-3*self.smoothing_kernel_std, 3*self.smoothing_kernel_std+1, 1)]
-                                       for i in torch.arange(-3*self.smoothing_kernel_std, 3*self.smoothing_kernel_std+1, 1)], dtype = torch.float32, device = utils.DEVICE
-            )
-        ))
-        self.smoothing_kernel /= self.smoothing_kernel.sum()
+        if self.smoothing_kernel_std <= 0:
+            return
+        self.smoothing_kernel_1d = torch.exp(
+            -(torch.arange(-3*self.smoothing_kernel_std, 3*self.smoothing_kernel_std + 1, 1) / (2 * self.smoothing_kernel_std)) ** 2
+        ).to(utils.DEVICE)
+        self.smoothing_kernel_1d /= self.smoothing_kernel_1d.sum()
 
 
     def __init__(
@@ -29,7 +27,7 @@ class SoftSomLoss2d:
         self.num_classes = num_classes
 
         self.smoothing_kernel_std = int(smoothing_kernel_std)
-        self.smoothing_kernel = None
+        self.smoothing_kernel_1d = None
         self.update_smoothing_kernel()
 
         # TODO: metode de initializare pentru self.weights? torch.nn.Parameter()?
@@ -50,27 +48,30 @@ class SoftSomLoss2d:
     ):
         dbg_time = time.time()
 
-        # l2_dists[i, j] = L2 distance between the i-th vector from y_sll and the j-th SOM unit
+        # sim_scores[i, j] = similarity (normalized(?) dot product) between the i-th vector from y_sll and the j-th SOM unit
         # (excluding class statistics, so only the first self.vector_length positions for each unit).
-        l2_dists = torch.vstack([torch.linalg.vector_norm(y_sll[i] - self.weights[:, :self.vector_length], dim = 1) for i in range(len(y_sll))])
+        sim_scores = y_sll @ self.weights[:, :self.vector_length].T # * self.inv_sqrt_vector_len
 
         # p_bmu_presm[i, j] = probability that the i-th vector from y_sll chooses the j-th SOM unit as its BMU (pre-smoothing)
-        p_bmu_presm = F.softmin(l2_dists / l2_dists.sum(dim = 1).view(-1, 1), dim = 1)
+        p_bmu_presm = F.softmax(sim_scores, dim = 1)
 
         # apply the smoothing kernel (cross-correlation with padding).
-        # also apply softmax over each unit (i.e. one softmax per each unit's batch_size probabilities. we want to force units to pick favourites)
         p_bmu = F.conv2d(
-            p_bmu_presm.view(-1, self.map_length, self.map_length).unsqueeze(dim = 1), # add a dimension for in_channels = 1. -1 <=> batch_size.
-            self.smoothing_kernel.unsqueeze(dim = 0).unsqueeze(dim = 0), # add two dimensions for out_channels = in_channels = 1.
-            padding = 3 * self.smoothing_kernel_std
+            F.conv2d(
+                p_bmu_presm.view(-1, self.map_length, self.map_length).unsqueeze(dim = 1), # add a dimension for in_channels = 1. -1 <=> batch_size.
+                self.smoothing_kernel_1d.view(1, 1, 1, -1),
+                padding = "same"
+            ),
+            self.smoothing_kernel_1d.view(1, 1, -1, 1),
+            padding = "same"
         ).view(-1, self.map_length ** 2)
-        
+
         self.dbg_time_spent["other"] += time.time() - dbg_time; dbg_time = time.time()
-       
+
         # tensor of shape [self.map_length**2, self.num_classes]. represents the probability distribution that a unit picks some class.
         class_proba_dist_per_unit = F.softmax(
             torch.hstack([
-                p_bmu[classes == z].sum(dim = 0).view(-1, 1)
+                p_bmu[classes == z].mean(dim = 0).view(-1, 1)
                 for z in range(self.num_classes)
             ]),
             dim = 1

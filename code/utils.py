@@ -4,7 +4,7 @@ import torch
 # import PIL
 
 IM_LEN = 160
-EPOCH_CNT = 40
+EPOCH_CNT = 80
 DEBUG_SAVE_EVERY = 10
 RUN_TYPE = "som" # "normal"
 MODEL_TYPE = "vgg" # "hw"
@@ -24,6 +24,7 @@ HT_DIR_CLASS = {
 }
 
 # the class names, in the order they are read by the loader.
+# (correct only if train is loaded first. is overwritten by the loader).
 LOADED_CLASS_NAMES = ["dog", "golf_ball", "french_horn", "gas_pump", "chain_saw", "fish", "parachute", "garbage_truck", "casette_player", "church"]
 
 DEVICE = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")

@@ -13,8 +13,10 @@ import utils
 
 
 NORMAL_NET_ID = "1739021122" # hw: 1738760468, vgg: 1739021122
-SOM_NET_ID = "1739379754"
+NORMAL_NUM_EPOCHS = 40
+SOM_NET_ID = "1743871520"
 SOM_MAP_LENGTH = 200
+SOM_NUM_EPOCHS = 80
 
 
 def explain_cam(ims_classes, nets):
@@ -197,7 +199,7 @@ def main():
     ]
 
     nets = []
-    for fpath in [f"../net_saves/net_{NORMAL_NET_ID}_40.pt", f"../net_saves/net_{SOM_NET_ID}_40.pt"]:
+    for fpath in [f"../net_saves/net_{NORMAL_NET_ID}_{NORMAL_NUM_EPOCHS}.pt", f"../net_saves/net_{SOM_NET_ID}_{SOM_NUM_EPOCHS}.pt"]:
         if utils.MODEL_TYPE == "hw":
             nets.append(design.HwNetworkGlobal(len_output = len(utils.HT_DIR_CLASS)))
         else:
@@ -212,7 +214,7 @@ def main():
         num_classes = len(utils.HT_DIR_CLASS),
         smoothing_kernel_std = 5
     )
-    som.weights = torch.load(f"../net_saves/som_weights_{SOM_NET_ID}_40.pt", weights_only = True, map_location = utils.DEVICE)
+    som.weights = torch.load(f"../net_saves/som_weights_{SOM_NET_ID}_{SOM_NUM_EPOCHS}.pt", weights_only = True, map_location = utils.DEVICE)
 
     print("Loaded nets, som weights.", flush = True)
 

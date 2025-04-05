@@ -71,7 +71,7 @@ def main():
         map_length = 200,
         vector_length = net.fc_last_layer.in_features if utils.MODEL_TYPE == "hw" else net.classifier[-1].in_features,
         num_classes = len(utils.HT_DIR_CLASS),
-        smoothing_kernel_std = 5
+        smoothing_kernel_std = 40
     )
 
     criterion = torch.nn.CrossEntropyLoss()
@@ -109,7 +109,7 @@ def main():
 
         if epoch % utils.DEBUG_SAVE_EVERY == 0 or epoch == utils.EPOCH_CNT:
             if utils.RUN_TYPE == "som": # scheduler.
-                soft_som_loss.smoothing_kernel_std -= 1
+                soft_som_loss.smoothing_kernel_std -= 5
                 soft_som_loss.update_smoothing_kernel()
 
             torch.save(net.state_dict(), f"../net_saves/net_{runid}_{epoch}.pt")
@@ -125,7 +125,7 @@ def main():
 
     fig, ax = plt.subplots(2, 3, figsize = (25, 17))
     
-    ax[0, 0].set_ylim((0, 5)) # loss.
+    ax[0, 0].set_ylim((0, 10)) # loss.
     ax[0, 1].set_ylim((0, 1)); ax[0, 2].set_ylim((0, 1)); ax[1, 0].set_ylim((0, 1)); ax[1, 1].set_ylim((0, 1)) # accuracy, precision, recall, f1.
 
     for metric, loc in zip(["loss", "accuracy", "precision", "recall", "f1"], [(i, j) for i in range(ax.shape[0]) for j in range(ax.shape[1])]):

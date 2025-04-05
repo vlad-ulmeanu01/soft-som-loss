@@ -8,7 +8,7 @@ import utils
 
 class Dataset(torch.utils.data.Dataset):
     #Initialization.
-    def __init__(self, dset_type: str, class_ht = None):
+    def __init__(self, dset_type: str, class_ht = None, break_after_fill_ht = False):
         assert(dset_type in ["train", "test"])
 
         self.dset = [] # [(X, y)].
@@ -29,10 +29,13 @@ class Dataset(torch.utils.data.Dataset):
                         self.class_ht[class_str]
                     ))
 
+                if break_after_fill_ht and len(self.class_ht) >= len(utils.HT_DIR_CLASS):
+                    break
+
         self.vgg_resizer = torchvision.transforms.Resize((240, 240), antialias = None)
 
         # TODO vezi cum poti sa pui tot self.dset direct pe gpu.
-        print(f"Finished loading Dataset ({dset_type = }).")
+        print(f"Finished loading Dataset ({dset_type = }) {'(! broke after filling ht)' if break_after_fill_ht else ''}.")
 
     #Denotes the total number of samples.
     def __len__(self):
